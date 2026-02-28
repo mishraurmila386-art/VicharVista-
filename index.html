@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VicharVista - Smart Status Maker</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+        
+        body { 
+            background: linear-gradient(135deg, #f0f2f5 0%, #e5e7eb 100%); 
+            display: flex; flex-direction: column; align-items: center; min-height: 100vh; 
+            color: #111827;
+        }
+        
+        .app-header {
+            width: 100%; max-width: 480px; padding: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .app-header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+        
+        .icon-btn {
+            background: #ffffff; border: none; width: 42px; height: 42px; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; transition: 0.3s; color: #374151;
+        }
+        .icon-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.1); color: #2563eb; }
+
+        /* Setup Screen */
+        #setup-screen {
+            background: #ffffff; width: 90%; max-width: 400px; padding: 35px 25px;
+            border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            margin-top: 40px; text-align: center;
+        }
+        #setup-screen h2 { margin-bottom: 25px; font-size: 20px; }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label { display: block; font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 8px; }
+        input[type="text"], input[type="file"] {
+            width: 100%; padding: 14px; background: #f9fafb; border: 1px solid #e5e7eb;
+            border-radius: 12px; font-size: 15px; outline: none; transition: 0.3s;
+        }
+        input[type="text"]:focus, #customQuoteInput:focus { border-color: #2563eb; background: #ffffff; }
+
+        /* Main Workspace */
+        #app-screen { display: none; width: 100%; max-width: 480px; padding: 0 20px 30px 20px; }
+        
+        .canvas-container {
+            width: 100%; border-radius: 24px; overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15); margin-bottom: 20px;
+            background: #e5e7eb; position: relative;
+        }
+        canvas { width: 100%; display: block; }
+        
+        #loading { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95); padding: 12px 24px; border-radius: 30px;
+            font-size: 14px; font-weight: 600; display: none; z-index: 10;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); color: #2563eb; text-align: center;
+        }
+
+        #customQuoteInput {
+            width: 100%; padding: 15px; border-radius: 16px; border: 1px solid #e5e7eb;
+            background: #ffffff; font-size: 14px; outline: none; resize: none;
+            margin-bottom: 15px; height: 75px; box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        }
+
+        .btn {
+            width: 100%; padding: 16px; border: none; border-radius: 16px;
+            font-size: 16px; font-weight: 600; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; gap: 10px; transition: all 0.3s ease;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; 
+            box-shadow: 0 8px 20px rgba(37,99,235,0.25); margin-bottom: 15px;
+        }
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn-secondary { background: #ffffff; color: #111827; border: 1px solid #e5e7eb; }
+        .btn-whatsapp { background: #25D366; color: white; border: none; }
+
+        /* Settings Modal */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); opacity: 0; pointer-events: none; transition: 0.3s; z-index: 99; backdrop-filter: blur(4px); }
+        .overlay.active { opacity: 1; pointer-events: auto; }
+        .bottom-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: #ffffff; border-radius: 30px 30px 0 0; padding: 30px 25px; transition: 0.4s; z-index: 100; }
+        .bottom-sheet.active { bottom: 0; }
+        .sheet-handle { width: 40px; height: 5px; background: #e5e7eb; border-radius: 10px; margin: 0 auto 25px auto; }
+        .profile-preview { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid #2563eb; margin: 0 auto 20px auto; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h2>Apni Profile Banayein</h2>
+        <div class="input-group">
+            <label>Aapka Naam</label>
+            <input type="text" id="userName" placeholder="Jaise: Rahul Sharma" required>
+        </div>
+        <div class="input-group">
+            <label>Profile Photo</label>
+            <input type="file" id="userPhoto" accept="image/*" required>
+        </div>
+        <button onclick="saveInitialProfile()" class="btn btn-primary">Save Karein</button>
+    </div>
+
+    <div id="app-screen">
+        <div class="app-header">
+            <h1>Vichar<span style="color:#2563eb;">Vista</span></h1>
+            <button onclick="openSettings()" class="icon-btn" title="Settings">
+                <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+        </div>
+
+        <div class="canvas-container">
+            <div id="loading">✨ Magic chal raha hai...</div>
+            <canvas id="statusCanvas" width="1080" height="1080"></canvas>
+        </div>
+        
+        <textarea id="customQuoteInput" placeholder="✍️ Apna bhakti ya motivation status likhein (Random status ke liye blank chhodein)..."></textarea>
+
+        <button onclick="generateNewStatus()" class="btn btn-primary">Naya Status Banayein</button>
+        
+        <div class="action-grid">
+            <button onclick="downloadStatus()" class="btn btn-secondary">⬇️ Save Photo</button>
+            <button onclick="shareOnWhatsApp()" class="btn btn-whatsapp">💬 WhatsApp Share</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeSettings()"></div>
+    <div class="bottom-sheet" id="bottomSheet">
+        <div class="sheet-handle"></div>
+        <img id="settingPreviewPhoto" src="" class="profile-preview">
+        <div class="input-group">
+            <label>Naam Badlein</label>
+            <input type="text" id="settingName">
+        </div>
+        <div class="input-group">
+            <label>Photo Badlein</label>
+            <input type="file" id="settingPhoto" accept="image/*" onchange="previewSettingPhoto(event)">
+        </div>
+        <button onclick="saveSettings()" class="btn btn-primary" style="margin-top: 10px;">Save Changes</button>
+        <button onclick="resetProfile()" class="btn btn-secondary" style="color: #dc2626; border-color: #fee2e2; background: #fef2f2;">Pura Data Delete Karein</button>
+    </div>
+
+    <script>
+        const setupScreen = document.getElementById('setup-screen');
+        const appScreen = document.getElementById('app-screen');
+        const canvas = document.getElementById('statusCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadingDiv = document.getElementById('loading');
+
+        // Backup Quotes
+        const premiumQuotes = [
+            "सफलता की शुरुआत हमेशा एक छोटी सी कोशिश से होती है।",
+            "मंज़िलें उन्हीं को मिलती हैं, जिनके सपनों में जान होती है।",
+            "वक्त और हालात को कोसने वाले, कभी इतिहास नहीं रचते।",
+            "खुद पर विश्वास रखो, चमत्कार अपने आप होंगे।"
+        ];
+
+        window.onload = function() {
+            if(localStorage.getItem('savedName') && localStorage.getItem('savedPhoto')) {
+                setupScreen.style.display = 'none';
+                appScreen.style.display = 'block';
+                generateNewStatus();
+            }
+        };
+
+        function saveInitialProfile() {
+            const name = document.getElementById('userName').value;
+            const photo = document.getElementById('userPhoto').files[0];
+            if(!name || !photo) return alert("Kripya details fill karein!");
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                localStorage.setItem('savedName', name);
+                localStorage.setItem('savedPhoto', e.target.result);
+                setupScreen.style.display = 'none';
+                appScreen.style.display = 'block';
+                generateNewStatus();
+            };
+            reader.readAsDataURL(photo);
+        }
+
+        function openSettings() {
+            document.getElementById('settingName').value = localStorage.getItem('savedName');
+            const preview = document.getElementById('settingPreviewPhoto');
+            preview.src = localStorage.getItem('savedPhoto');
+            preview.style.display = 'block';
+            document.getElementById('overlay').classList.add('active');
+            document.getElementById('bottomSheet').classList.add('active');
+        }
+
+        function closeSettings() {
+            document.getElementById('overlay').classList.remove('active');
+            document.getElementById('bottomSheet').classList.remove('active');
+        }
+
+        function previewSettingPhoto(event) {
+            if(event.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => document.getElementById('settingPreviewPhoto').src = e.target.result;
+                reader.readAsDataURL(event.target.files[0]);
+            }
+        }
+
+        function saveSettings() {
+            const newName = document.getElementById('settingName').value;
+            const file = document.getElementById('settingPhoto').files[0];
+            if(newName) localStorage.setItem('savedName', newName);
+            if(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    localStorage.setItem('savedPhoto', e.target.result);
+                    closeSettings(); generateNewStatus();
+                };
+                reader.readAsDataURL(file);
+            } else { closeSettings(); generateNewStatus(); }
+        }
+
+        function resetProfile() {
+            if(confirm("Kya aap sach me saara data delete karna chahte hain?")) {
+                localStorage.clear(); location.reload();
+            }
+        }
+
+        function loadImageAsync(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = () => resolve(img);
+                img.onerror = () => reject();
+                img.src = url;
+            });
+        }
+
+        // Smart Bhakti Keyword Checker
+        function getSmartBackground(text) {
+            const lowerText = text.toLowerCase();
+            if (lowerText.includes("mahadev") || lowerText.includes("shiv") || lowerText.includes("bholenath") || lowerText.includes("महादेव") || lowerText.includes("शिव")) {
+                return `https://image.pollinations.ai/prompt/lord%20shiva%20meditating%20aesthetic%20dark%20background?width=1080&height=1080&nologo=true&seed=${Date.now()}`;
+            } else if (lowerText.includes("ram") || lowerText.includes("ayodhya") || lowerText.includes("राम") || lowerText.includes("shree ram")) {
+                return `https://image.pollinations.ai/prompt/lord%20rama%20ayodhya%20temple%20aesthetic%20background?width=1080&height=1080&nologo=true&seed=${Date.now()}`;
+            } else if (lowerText.includes("krishna") || lowerText.includes("radhe") || lowerText.includes("कृष्ण") || lowerText.includes("राधा")) {
+                return `https://image.pollinations.ai/prompt/lord%20krishna%20flute%20peacock%20feather%20aesthetic%20background?width=1080&height=1080&nologo=true&seed=${Date.now()}`;
+            } else if (lowerText.includes("hanuman") || lowerText.includes("bajrang") || lowerText.includes("हनुमान")) {
+                return `https://image.pollinations.ai/prompt/lord%20hanuman%20powerful%20aesthetic%20background?width=1080&height=1080&nologo=true&seed=${Date.now()}`;
+            } else if (lowerText.includes("mata") || lowerText.includes("durga") || lowerText.includes("माता")) {
+                return `https://image.pollinations.ai/prompt/goddess%20durga%20lion%20aesthetic%20background?width=1080&height=1080&nologo=true&seed=${Date.now()}`;
+            }
+            return `https://picsum.photos/seed/${Math.random()}/1080/1080`;
+        }
+
+        async function generateNewStatus() {
+            loadingDiv.innerText = "✨ Magic chal raha hai...";
+            loadingDiv.style.display = 'block';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let finalQuoteText = "";
+            const customInput = document.getElementById('customQuoteInput').value.trim();
+
+            if (customInput !== "") {
+                finalQuoteText = customInput;
+            } else {
+                try {
+                    const response = await fetch('https://hindi-quotes.vercel.app/random');
+                    const data = await response.json();
+                    finalQuoteText = data.quote;
+                } catch (error) {
+                    finalQuoteText = premiumQuotes[Math.floor(Math.random() * premiumQuotes.length)];
+                }
+            }
+
+            try {
+                // Background
+                const bgUrl = getSmartBackground(finalQuoteText);
+                const bgImage = await loadImageAsync(bgUrl);
+                ctx.drawImage(bgImage, 0, 0, 1080, 1080);
+
+                // Dark Gradient
+                const gradient = ctx.createLinearGradient(0, 0, 0, 1080);
+                gradient.addColorStop(0, "rgba(0, 0, 0, 0.4)");
+                gradient.addColorStop(0.5, "rgba(0, 0, 0, 0.6)");
+                gradient.addColorStop(1, "rgba(0, 0, 0, 0.95)");
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 1080, 1080);
+
+                // Quote Text (Day hatne ke baad ekdum center me set kiya hai: y=540)
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 60px Poppins, sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                ctx.shadowBlur = 15;
+                wrapText(ctx, `"${finalQuoteText}"`, 540, 540, 920, 85);
+                ctx.shadowBlur = 0; 
+
+                // User Identity
+                const userPhoto = await loadImageAsync(localStorage.getItem('savedPhoto'));
+                const imgSize = 100;
+                const imgX = 50;
+                const imgY = 930;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(imgX + imgSize/2, imgY + imgSize/2, imgSize/2, 0, Math.PI * 2, true);
+                ctx.closePath();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.clip();
+                ctx.drawImage(userPhoto, imgX, imgY, imgSize, imgSize);
+                ctx.restore();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "600 42px Poppins, sans-serif";
+                ctx.textAlign = "left";
+                ctx.fillText(localStorage.getItem('savedName'), 175, 980);
+                
+                ctx.fillStyle = "rgba(255,255,255,0.4)";
+                ctx.font = "400 24px Poppins, sans-serif";
+                ctx.textAlign = "right";
+                ctx.fillText("VicharVista", 1030, 1040);
+
+                loadingDiv.style.display = 'none';
+
+            } catch (error) {
+                loadingDiv.innerText = "Error loading image.";
+            }
+        }
+
+        // Text wrapper helper
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            const words = text.split(' ');
+            let line = ''; let currentY = y;
+            for(let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                if (context.measureText(testLine).width > maxWidth && n > 0) {
+                    context.fillText(line.trim(), x, currentY);
+                    line = words[n] + ' '; currentY += lineHeight;
+                } else { line = testLine; }
+            }
+            context.fillText(line.trim(), x, currentY);
+        }
+
+        // Auto Download Function
+        function downloadStatus() {
+            try {
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                const link = document.createElement('a');
+                link.download = `VicharVista_${Date.now()}.png`;
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                alert("Photo aapki gallery me save ho gayi hai!");
+            } catch(e) {
+                alert("Gallery me save karne me dikkat aa rahi hai.");
+            }
+        }
+
+        // WhatsApp Smart Share Hack for HopWeb
+        function shareOnWhatsApp() {
+            try {
+                // 1. Pehle photo background me save hogi
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                const link = document.createElement('a');
+                link.download = `VicharVista_Status_${Date.now()}.png`;
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // 2. Loading message dikhayenge
+                loadingDiv.innerText = "Photo Save hui. WhatsApp khul raha hai...";
+                loadingDiv.style.display = 'block';
+
+                // 3. 1.5 second baad automatically phone ka WhatsApp open ho jayega
+                setTimeout(() => {
+                    loadingDiv.style.display = 'none';
+                    const whatsappMessage = encodeURIComponent("VicharVista App se banaya gaya mera naya status! ✨");
+                    // Ye URL direct WhatsApp app ko trigger karti hai
+                    window.location.href = `whatsapp://send?text=${whatsappMessage}`;
+                }, 1500);
+
+            } catch(e) {
+                alert("Share nahi ho pa raha. Kripya pehle Save Photo button dabayein.");
+            }
+        }
+    </script>
+</body>
+</html>
